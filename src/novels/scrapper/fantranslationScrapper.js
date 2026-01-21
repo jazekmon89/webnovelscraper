@@ -1,12 +1,12 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const BASE_URL = "https://fanstranslations.com/";
+const BASE_URL = "https://foxaholic.com/";
 
 function scrapeData(data){
   const $ = cheerio.load(data);
   const novels = [];
   
-  $(".page-listing-item  .badge-pos-1").each((i, element) => {
+  $(".page-listing-item  .badge-pos-2").each((i, element) => {
     const pageItemDetail = $(element).find(".page-item-detail");
     const id = pageItemDetail.find(".item-thumb a").first().attr("href").split(BASE_URL).pop();
     const cover = pageItemDetail.find(".item-thumb img").attr("src") || "";
@@ -28,7 +28,7 @@ function scrapeData(data){
 }
 
 async function scrapeLatestRelease(page){
-  const url = `${BASE_URL}page/${page}/`;
+  const url = `${BASE_URL}novel/page/${page}/`;
   const { data } = await axios.get(url);
   return scrapeData(data);
 }
