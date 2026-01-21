@@ -6,7 +6,7 @@ const {
   scrapeNewestNovels,
   scrapeMostRatedNovels,
   scrapeAllNovels
-} = require("../scrapper/fantranslationScrapperPuppeteer");
+} = require("../scrapper/fantranslationScrapper");
 
 async function getLatestChapter(req, res){
   const page = req.query.page || 1;
@@ -23,8 +23,8 @@ async function getLatestChapter(req, res){
     if (error.response && error.response.status === 403) {
       return res.status(503).send({ 
         success: false, 
-        message: "The target website is blocking automated requests. This is a known issue with Cloudflare protection. Please try again later or contact the administrator.",
-        error: "Website blocking (403 Forbidden)"
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
       });
     }
     return res.status(500).send({ success: false, message: error.message, });
@@ -40,8 +40,15 @@ async function getFinishedNovels(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
+      });
+    }
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch data from Fan Translations!", });
   }
 }
 async function getTrendingNovels(req, res){
@@ -54,8 +61,15 @@ async function getTrendingNovels(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
+      });
+    }
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch data from Fan Translations!", });
   }
 }
 async function getMostViewedNovels(req, res){
@@ -68,8 +82,15 @@ async function getMostViewedNovels(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
+      });
+    }
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch data from Fan Translations!", });
   }
 }
 async function getNewestNovels(req, res){
@@ -82,8 +103,15 @@ async function getNewestNovels(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
+      });
+    }
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch data from Fan Translations!", });
   }
 }
 async function getMostRatedNovels(req, res){
@@ -96,8 +124,15 @@ async function getMostRatedNovels(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website (foxaholic.com) is currently blocking automated requests with Cloudflare protection. This endpoint is temporarily unavailable.",
+        technicalDetails: "403 Forbidden - Bot detection active"
+      });
+    }
+    return res.status(500).send({ success: false, message: error.message || "Failed to fetch data from Fan Translations!", });
   }
 }
 async function getAllNovels(req, res){

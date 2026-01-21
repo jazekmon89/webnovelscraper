@@ -1,56 +1,99 @@
 const chromium = require("@sparticuz/chromium");
 const puppeteer = require("puppeteer-core");
 const cheerio = require("cheerio");
+const axios = require("axios");
 const BASE_URL = "https://www.foxaholic.com/";
 
 let browser = null;
 
+// Fallback to axios if Puppeteer fails
+async function fetchWithAxios(url) {
+  const axiosInstance = axios.create({
+    timeout: 30000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': 'https://www.foxaholic.com/',
+      'Connection': 'keep-alive',
+    }
+  });
+  
+  const response = await axiosInstance.get(url);
+  return response.data;
+}
+
 async function getBrowser() {
   if (!browser) {
-    // Check if running on Vercel/serverless environment
-    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION;
-    
-    if (isServerless) {
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-      });
-    } else {
-      // Local development - use regular puppeteer
-      const puppeteerLocal = require("puppeteer");
-      browser = await puppeteerLocal.launch({
-        headless: "new",
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-        ]
-      });
+    try {
+      // Check if running on Vercel/serverless environment
+      const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_VERSION;
+      
+      if (isServerless) {
+        // Configure chromium for serverless
+        chromium.setHeadlessMode = true;
+        chromium.setGraphicsMode = false;
+        
+        browser = await puppeteer.launch({
+          args: [
+            ...chromium.args,
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--disable-setuid-sandbox',
+            '--no-first-run',
+            '--no-sandbox',
+            '--no-zygote',
+            '--single-process'
+          ],
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+          ignoreHTTPSErrors: true,
+        });
+      } else {
+        // Local development - use regular puppeteer
+        const puppeteerLocal = require("puppeteer");
+        browser = await puppeteerLocal.launch({
+          headless: "new",
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+          ]
+        });
+      }
+    } catch (error) {
+      console.error("Failed to launch browser:", error);
+      throw error;
     }
   }
   return browser;
 }
 
 async function fetchPage(url) {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  
   try {
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    const browser = await getBrowser();
+    const page = await browser.newPage();
     
-    await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 30000
-    });
-    
-    const html = await page.content();
-    await page.close();
-    return html;
-  } catch (error) {
-    await page.close();
-    throw error;
+    try {
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      const html = await page.content();
+      await page.close();
+      return html;
+    } catch (error) {
+      await page.close();
+      throw error;
+    }
+  } catch (browserError) {
+    console.error("Browser error, falling back to axios:", browserError.message);
+    // Fallback to axios if browser fails
+    return await fetchWithAxios(url);
   }
 }
 

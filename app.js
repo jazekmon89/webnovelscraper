@@ -1,7 +1,6 @@
 const express = require("express");
 const esnovelRoutes = require("./src/novels/routes/esnovelsRoutes");
-const fanTranslationRoutes = require("./src/novels/routes/fantranslationRoute");
-
+const fanTranslationRoutes = require("./src/novels/routes/fantranslationRoute");const royalroadRoutes = require("./src/novels/routes/royalroadRoutes");
 const app = express();
 const port = 5000;
 
@@ -24,6 +23,7 @@ app.get("/", (req, res) => {
 
 // app.use("/novel", esnovelRoutes);
 app.use("/novel", fanTranslationRoutes);
+app.use("/novel", royalroadRoutes);
 
 // Start server
 app.listen(port, () => {
