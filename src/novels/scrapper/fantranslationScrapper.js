@@ -6,7 +6,7 @@ function scrapeData(data){
   const $ = cheerio.load(data);
   const novels = [];
   
-  $(".page-listing-item  .badge-pos-2").each((i, element) => {
+  $(".page-listing-item .badge-pos-2").each((i, element) => {
     const pageItemDetail = $(element).find(".page-item-detail");
     const id = pageItemDetail.find(".item-thumb a").first().attr("href").split(BASE_URL).pop();
     const cover = pageItemDetail.find(".item-thumb img").attr("src") || "";

@@ -18,8 +18,8 @@ async function getLatestChapter(req, res){
       return res.status(404).send({ success: false, message: "Page not found!", });
     }
   }catch(error){
-    console.log("Failed to fetch data from Fan Translations!");
-    return res.status(500).send({ success: false, message: "Failed to fetch data from Fan Translations!", });
+    console.error("Failed to fetch data from Fan Translations!", error);
+    return res.status(500).send({ success: false, message: error.message, });
   }
 }
 async function getFinishedNovels(req, res){
