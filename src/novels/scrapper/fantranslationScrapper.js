@@ -1,6 +1,6 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const BASE_URL = "https://foxaholic.com/";
+const BASE_URL = "https://www.foxaholic.com/";
 
 function scrapeData(data){
   const $ = cheerio.load(data);
