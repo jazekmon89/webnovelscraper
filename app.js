@@ -1,5 +1,5 @@
 const express = require("express");
-const esnovelRoutes = require("./src/novels/routes/esnovelsRoutes");
+// const esnovelRoutes = require("./src/novels/routes/esnovelsRoutes");
 const fanTranslationRoutes = require("./src/novels/routes/fantranslationRoute");const royalroadRoutes = require("./src/novels/routes/royalroadRoutes");
 const app = express();
 const port = 5000;
