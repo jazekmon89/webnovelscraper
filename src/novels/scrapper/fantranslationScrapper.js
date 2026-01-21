@@ -2,6 +2,22 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const BASE_URL = "https://www.foxaholic.com/";
 
+// Configure axios with browser-like headers
+const axiosInstance = axios.create({
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Cache-Control': 'max-age=0'
+  }
+});
+
 function scrapeData(data){
   const $ = cheerio.load(data);
   const novels = [];
@@ -29,37 +45,37 @@ function scrapeData(data){
 
 async function scrapeLatestRelease(page){
   const url = `${BASE_URL}novel/page/${page}/`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeFinishedNovels(page){
   const url = `${BASE_URL}novel-tag/finished/page/${page}/`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeTrendingNovels(page){
   const url = `${BASE_URL}novel/page/${page}/?m_orderby=trending`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeMostViewedNovels(page){
   const url = `${BASE_URL}novel/page/${page}/?m_orderby=views`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeNewestNovels(page){
   const url = `${BASE_URL}novel/page/${page}/?m_orderby=new-manga`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeMostRatedNovels(page){
   const url = `${BASE_URL}novel/page/${page}/?m_orderby=rating`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 async function scrapeAllNovels(page){
   const url = `${BASE_URL}novel/page/${page}/?m_orderby=alphabet`;
-  const { data } = await axios.get(url);
+  const { data } = await axiosInstance.get(url);
   return scrapeData(data);
 }
 
