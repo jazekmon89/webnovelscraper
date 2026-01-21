@@ -6,7 +6,7 @@ const {
   scrapeNewestNovels,
   scrapeMostRatedNovels,
   scrapeAllNovels
-} = require("../scrapper/fantranslationScrapper");
+} = require("../scrapper/fantranslationScrapperPuppeteer");
 
 async function getLatestChapter(req, res){
   const page = req.query.page || 1;
@@ -19,6 +19,14 @@ async function getLatestChapter(req, res){
     }
   }catch(error){
     console.error("Failed to fetch data from Fan Translations!", error);
+    // Provide more detailed error information
+    if (error.response && error.response.status === 403) {
+      return res.status(503).send({ 
+        success: false, 
+        message: "The target website is blocking automated requests. This is a known issue with Cloudflare protection. Please try again later or contact the administrator.",
+        error: "Website blocking (403 Forbidden)"
+      });
+    }
     return res.status(500).send({ success: false, message: error.message, });
   }
 }
