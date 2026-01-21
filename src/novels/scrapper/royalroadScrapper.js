@@ -25,34 +25,36 @@ async function scrapeLatestUpdates(page = 1) {
     
     if (title && href) {
       const id = href.split('/fiction/')[1]?.split('/')[0];
-      const coverImg = $(el).find('img.cover-img').attr('src');
-      const author = $(el).find('.author a').text().trim();
-      const authorUrl = $(el).find('.author a').attr('href');
+      const coverImg = $(el).find('img').attr('src');
       const tags = [];
       
       $(el).find('.tags a').each((j, tag) => {
         tags.push($(tag).text().trim());
       });
       
-      const stats = $(el).find('.stats .fa-book').parent().text().trim();
-      const pages = $(el).find('.stats .fa-list').parent().text().trim();
-      const rating = $(el).find('.stats .fa-star').parent().text().trim();
+      // Get latest chapters from this page
+      const chapters = [];
+      $(el).find('ul.list-unstyled li.list-item a').each((j, chap) => {
+        const chapterTitle = $(chap).find('span.col-xs-8').text().trim();
+        const timeAgo = $(chap).find('time').text().trim();
+        const chapterHref = $(chap).attr('href');
+        
+        if (chapterTitle) {
+          chapters.push({
+            title: chapterTitle,
+            url: BASE_URL + chapterHref,
+            timeAgo: timeAgo + ' ago'
+          });
+        }
+      });
       
       novels.push({
         id,
         title,
         url: BASE_URL + href,
         cover: coverImg || '',
-        author: {
-          name: author,
-          url: authorUrl ? BASE_URL + authorUrl : ''
-        },
         tags,
-        stats: {
-          chapters: stats,
-          pages,
-          rating
-        }
+        latestChapters: chapters
       });
     }
   });
@@ -73,17 +75,19 @@ async function scrapePopular(page = 1) {
     
     if (title && href) {
       const id = href.split('/fiction/')[1]?.split('/')[0];
-      const coverImg = $(el).find('img.cover-img').attr('src');
-      const author = $(el).find('.author a').text().trim();
-      const description = $(el).find('.margin-top-10').text().trim();
+      const coverImg = $(el).find('img').attr('src');
+      const tags = [];
+      
+      $(el).find('.tags a').each((j, tag) => {
+        tags.push($(tag).text().trim());
+      });
       
       novels.push({
         id,
         title,
         url: BASE_URL + href,
         cover: coverImg || '',
-        author: author,
-        description
+        tags
       });
     }
   });
@@ -104,15 +108,19 @@ async function scrapeTrending(page = 1) {
     
     if (title && href) {
       const id = href.split('/fiction/')[1]?.split('/')[0];
-      const coverImg = $(el).find('img.cover-img').attr('src');
-      const author = $(el).find('.author a').text().trim();
+      const coverImg = $(el).find('img').attr('src');
+      const tags = [];
+      
+      $(el).find('.tags a').each((j, tag) => {
+        tags.push($(tag).text().trim());
+      });
       
       novels.push({
         id,
         title,
         url: BASE_URL + href,
         cover: coverImg || '',
-        author: author
+        tags
       });
     }
   });
@@ -133,13 +141,19 @@ async function scrapeWeeklyPopular(page = 1) {
     
     if (title && href) {
       const id = href.split('/fiction/')[1]?.split('/')[0];
-      const coverImg = $(el).find('img.cover-img').attr('src');
+      const coverImg = $(el).find('img').attr('src');
+      const tags = [];
+      
+      $(el).find('.tags a').each((j, tag) => {
+        tags.push($(tag).text().trim());
+      });
       
       novels.push({
         id,
         title,
         url: BASE_URL + href,
-        cover: coverImg || ''
+        cover: coverImg || '',
+        tags
       });
     }
   });
@@ -160,15 +174,19 @@ async function scrapeSearch(query, page = 1) {
     
     if (title && href) {
       const id = href.split('/fiction/')[1]?.split('/')[0];
-      const coverImg = $(el).find('img.cover-img').attr('src');
-      const author = $(el).find('.author a').text().trim();
+      const coverImg = $(el).find('img').attr('src');
+      const tags = [];
+      
+      $(el).find('.tags a').each((j, tag) => {
+        tags.push($(tag).text().trim());
+      });
       
       novels.push({
         id,
         title,
         url: BASE_URL + href,
         cover: coverImg || '',
-        author: author
+        tags
       });
     }
   });
