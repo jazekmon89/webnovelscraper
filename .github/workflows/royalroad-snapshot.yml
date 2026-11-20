@@ -23,7 +23,8 @@ concurrency:
 
 jobs:
   # The Android app (android/) normally keeps the snapshot fresh from a phone, so the
-  # scheduled runs only scrape when its data is over an hour old
+  # scheduled runs only scrape when its data is over 90 minutes old (the app can run as
+  # rarely as hourly)
   check:
     runs-on: ubuntu-24.04
     outputs:
@@ -33,7 +34,7 @@ jobs:
         run: |
           updated=$(curl -sf https://raw.githubusercontent.com/${{ github.repository }}/data/royalroad/latest-1.json | jq -r '.updatedAt // empty') || true
           age=$(( $(date +%s) - $(date -d "${updated:-1970-01-01}" +%s) ))
-          if [ "$GITHUB_EVENT_NAME" != schedule ] || [ "$age" -gt 3600 ]; then
+          if [ "$GITHUB_EVENT_NAME" != schedule ] || [ "$age" -gt 5400 ]; then
             echo "stale=true" >> "$GITHUB_OUTPUT"
           else
             echo "::notice::Snapshot is $((age / 60)) minutes old; skipping"

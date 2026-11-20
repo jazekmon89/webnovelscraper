@@ -12,12 +12,20 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputType
+import android.view.Gravity
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Settings and run log. The scraping itself happens in SnapshotService.
 class MainActivity : Activity() {
@@ -26,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var tokenState: TextView
     private lateinit var batteryButton: Button
     private lateinit var toggleButton: Button
+    private lateinit var nextRun: TextView
     private lateinit var log: TextView
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> refresh() }
 
@@ -66,6 +75,16 @@ class MainActivity : Activity() {
         batteryButton = button("") {
             startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
         }
+        nextRun = TextView(this)
+        // 5 minutes is the fastest useful interval: the API reads the files through
+        // raw.githubusercontent.com, which caches them for 5 minutes
+        val interval = setting("Run every", Store.INTERVAL_CHOICES, "min", Store.intervalMinutes(this)) {
+            Store.setIntervalMinutes(this, it)
+            if (Store.enabled(this)) SnapshotService.start(this)
+        }
+        val pageDelay = setting("Wait between pages", Store.PAGE_DELAY_CHOICES, "s", Store.pageDelaySeconds(this)) {
+            Store.setPageDelaySeconds(this, it)
+        }
         log = TextView(this).apply {
             typeface = Typeface.MONOSPACE
             textSize = 12f
@@ -82,6 +101,10 @@ class MainActivity : Activity() {
                 addView(runNow)
                 addView(toggleButton)
                 addView(batteryButton)
+                addView(TextView(context).apply { text = "\nSettings"; setTypeface(null, Typeface.BOLD) })
+                addView(interval)
+                addView(pageDelay)
+                addView(nextRun)
                 addView(TextView(context).apply { text = "\nRecent runs (newest first):"; setTypeface(null, Typeface.BOLD) })
                 addView(log)
             })
@@ -108,11 +131,39 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         tokenState.text = if (Store.token(this).isNullOrBlank()) "No GitHub token saved yet." else "GitHub token saved ✓ (paste a new one to replace it)"
-        toggleButton.text = if (Store.enabled(this)) "Stop background runs" else "Start background runs (every 30 min)"
+        toggleButton.text = if (Store.enabled(this)) "Stop background runs" else "Start background runs"
+        nextRun.text = when {
+            !Store.enabled(this) -> "Background runs are off."
+            Store.nextRun(this) <= System.currentTimeMillis() -> "Next run: now"
+            else -> "Next run: around " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(Store.nextRun(this)))
+        }
         val unrestricted = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
         batteryButton.text = if (unrestricted) "Background running allowed ✓" else "Allow running in background"
         batteryButton.isEnabled = !unrestricted
         log.text = Store.log(this).ifEmpty { "No runs yet." }
+    }
+
+    // A labelled dropdown of number choices; onPick runs when the user picks a different one
+    private fun setting(label: String, choices: List<Int>, unit: String, current: Int, onPick: (Int) -> Unit): LinearLayout {
+        var selected = current
+        val spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, choices.map { "$it $unit" })
+            setSelection(choices.indexOf(current).coerceAtLeast(0))
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    if (choices[position] == selected) return
+                    selected = choices[position]
+                    onPick(selected)
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
+        }
+        return LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(context).apply { text = label }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(spinner)
+        }
     }
 
     private fun button(label: String, onClick: () -> Unit) = Button(this).apply {

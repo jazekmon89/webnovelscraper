@@ -15,14 +15,17 @@ import java.time.Instant
 // engine, which Cloudflare lets through from the phone) and parses each one into the same
 // JSON that scripts/snapshot-royalroad.js writes. Must be used on the main thread.
 @SuppressLint("SetJavaScriptEnabled")
-class Scraper(context: Context, private val onDone: (files: Map<String, String>, errors: List<String>) -> Unit) {
+class Scraper(
+    context: Context,
+    private val pageDelayMs: Long,
+    private val onDone: (files: Map<String, String>, errors: List<String>) -> Unit
+) {
 
     class Page(val name: String, val file: String, val path: String, val withChapters: Boolean = false)
 
     companion object {
         private const val BASE_URL = "https://www.royalroad.com"
         private const val PAGE_TIMEOUT_MS = 60_000L
-        private const val PAGE_DELAY_MS = 15_000L
 
         // Keep in sync with SNAPSHOT_LISTS in src/novels/scrapper/royalroadScrapper.js
         val PAGES = listOf(
@@ -126,7 +129,7 @@ class Scraper(context: Context, private val onDone: (files: Map<String, String>,
 
     private fun afterPage() {
         if (queue.isEmpty()) return done()
-        handler.postDelayed({ next() }, PAGE_DELAY_MS)
+        handler.postDelayed({ next() }, pageDelayMs)
     }
 
     private fun done() {

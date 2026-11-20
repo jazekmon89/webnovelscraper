@@ -19,6 +19,18 @@ object Store {
     fun enabled(context: Context) = prefs(context).getBoolean("enabled", false)
     fun setEnabled(context: Context, enabled: Boolean) = prefs(context).edit().putBoolean("enabled", enabled).apply()
 
+    val INTERVAL_CHOICES = listOf(5, 10, 15, 30, 60)
+    val PAGE_DELAY_CHOICES = listOf(5, 10, 15)
+
+    fun intervalMinutes(context: Context) = prefs(context).getInt("intervalMinutes", 30)
+    fun setIntervalMinutes(context: Context, minutes: Int) = prefs(context).edit().putInt("intervalMinutes", minutes).apply()
+
+    // Wait between the pages of one run
+    fun pageDelaySeconds(context: Context) = prefs(context).getInt("pageDelaySeconds", 15)
+    fun setPageDelaySeconds(context: Context, seconds: Int) = prefs(context).edit().putInt("pageDelaySeconds", seconds).apply()
+
+    fun nextRun(context: Context) = lastRun(context) + intervalMinutes(context) * 60_000L
+
     fun lastRun(context: Context) = prefs(context).getLong("lastRun", 0)
     fun setLastRun(context: Context, time: Long) = prefs(context).edit().putLong("lastRun", time).apply()
 

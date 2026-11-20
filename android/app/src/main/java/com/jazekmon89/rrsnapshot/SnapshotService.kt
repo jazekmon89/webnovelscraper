@@ -19,13 +19,12 @@ import android.os.PowerManager
 import java.util.concurrent.Executors
 
 // Keeps running in the foreground (with a status notification, which Android requires) and
-// scrapes Royal Road every 30 minutes. An alarm wakes the phone for each run, since timers
-// inside the app stop while the phone sleeps.
+// scrapes Royal Road at the interval chosen in the app. An alarm wakes the phone for each
+// run, since timers inside the app stop while the phone sleeps.
 class SnapshotService : Service() {
 
     companion object {
         private const val ACTION_RUN = "com.jazekmon89.rrsnapshot.RUN"
-        private const val INTERVAL_MS = 30 * 60 * 1000L
         private const val CHANNEL = "status"
         private const val NOTIFICATION_ID = 1
 
@@ -63,21 +62,28 @@ class SnapshotService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         showStatus(Store.status(this))
-        // Started without a run request (app opened, phone rebooted): only run if one is due
-        val nextRun = Store.lastRun(this) + INTERVAL_MS
+        // Started without a run request (app opened, phone rebooted, interval changed): only
+        // run if one is due
+        val nextRun = Store.nextRun(this)
         if (intent?.action == ACTION_RUN || System.currentTimeMillis() >= nextRun) run() else scheduleAt(nextRun)
         return START_STICKY
     }
 
+    // Exact when allowed: an inexact alarm can fire up to 75% of the interval late. While the
+    // phone is idle, Android still spaces these out to about one per 9 minutes.
     private fun scheduleAt(time: Long) {
-        getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, alarmIntent(this))
+        val alarms = getSystemService(AlarmManager::class.java)
+        if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms()) {
+            alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, alarmIntent(this))
+        } else {
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, alarmIntent(this))
+        }
     }
 
     private fun run() {
         if (running) return
-        val now = System.currentTimeMillis()
-        Store.setLastRun(this, now)
-        scheduleAt(now + INTERVAL_MS)
+        Store.setLastRun(this, System.currentTimeMillis())
+        scheduleAt(Store.nextRun(this))
 
         val token = Store.token(this)
         if (token.isNullOrBlank()) return report("Skipped: no GitHub token saved")
@@ -89,7 +95,7 @@ class SnapshotService : Service() {
             .apply { acquire(5 * 60 * 1000L) }
         showStatus("Scraping Royal Road…")
 
-        Scraper(this) { files, errors ->
+        Scraper(this, Store.pageDelaySeconds(this) * 1000L) { files, errors ->
             executor.execute {
                 val uploadError = if (files.isEmpty()) null else runCatching { GitHub.publish(token, files) }.exceptionOrNull()
                 handler.post {
