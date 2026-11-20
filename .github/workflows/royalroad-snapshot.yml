@@ -1,7 +1,8 @@
 # Scrapes the Royal Road lists every 30 minutes and publishes them as JSON on the
 # "data" branch, which the API reads (see src/novels/scrapper/royalroadScrapper.js).
-# Royal Road's Cloudflare challenge only lets a headful Google Chrome through,
-# so the scraper runs real Chrome under Xvfb.
+# Royal Road's Cloudflare challenge only lets a headful Google Chrome through, and
+# from a runner's IP only the first page per session, so each page gets its own job
+# (and so its own runner).
 name: Royal Road snapshot
 
 on:
@@ -21,13 +22,24 @@ concurrency:
   group: royalroad-snapshot
 
 jobs:
-  snapshot:
+  scrape:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      # Keep in sync with SNAPSHOT_LISTS in src/novels/scrapper/royalroadScrapper.js
+      matrix:
+        target:
+          - latest 1
+          - latest 2
+          - latest 3
+          - popular 1
+          - trending 1
+          - weekly 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -37,12 +49,29 @@ jobs:
           npm ci --omit=dev
           npm install --no-save playwright-core@1.56.1
 
-      # Start from the previous snapshot so a page that fails to load keeps its old data
+      - name: Scrape Royal Road (${{ matrix.target }})
+        run: xvfb-run -a -s "-screen 0 1366x768x24" node scripts/snapshot-royalroad.js out ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-${{ strategy.job-index }}
+          path: out/*.json
+          retention-days: 1
+
+  publish:
+    needs: scrape
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      # Start from the previous snapshot so a page that failed keeps its old data
       - name: Load previous snapshot
         run: git clone --depth 1 --branch data "https://github.com/${{ github.repository }}.git" data-out || mkdir data-out
 
-      - name: Scrape Royal Road
-        run: xvfb-run -a -s "-screen 0 1366x768x24" node scripts/snapshot-royalroad.js data-out/royalroad
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: snapshot-*
+          path: data-out/royalroad
+          merge-multiple: true
 
       # The data branch keeps a single commit so its history doesn't grow
       - name: Publish snapshot
