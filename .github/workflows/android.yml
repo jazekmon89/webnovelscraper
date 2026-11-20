@@ -36,7 +36,7 @@ jobs:
         working-directory: android
         run: |
           set -o pipefail
-          gradle assembleDebug 2>&1 | tee build.log || {
+          gradle assembleDebug -PversionCode=${{ github.run_number }} 2>&1 | tee build.log || {
             grep -E "^e: |error:|What went wrong" -A2 build.log | head -30 | sed 's/^/::error::/'
             exit 1
           }

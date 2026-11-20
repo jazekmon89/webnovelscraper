@@ -1,136 +1,124 @@
 package com.jazekmon89.rrsnapshot
 
-import android.annotation.SuppressLint
+import android.Manifest
 import android.app.Activity
+import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.webkit.CookieManager
-import android.webkit.WebStorage
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.os.PowerManager
+import android.provider.Settings
+import android.text.InputType
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import org.json.JSONArray
+import android.widget.Toast
 
-// Test app: checks whether Royal Road's Cloudflare challenge lets this phone through.
-// It loads the snapshot pages in a visible WebView and reports, for each page, whether
-// the novel list appeared or the page stayed on "Just a moment...".
+// Settings and run log. The scraping itself happens in SnapshotService.
 class MainActivity : Activity() {
 
-    private val pages = listOf(
-        "latest 1" to "/fictions/latest-updates?page=1",
-        "latest 2" to "/fictions/latest-updates?page=2",
-        "latest 3" to "/fictions/latest-updates?page=3",
-        "popular 1" to "/fictions/best-rated?page=1",
-        "trending 1" to "/fictions/trending?page=1",
-        "weekly 1" to "/fictions/weekly-popular?page=1"
-    )
-
-    private val handler = Handler(Looper.getMainLooper())
-    private lateinit var webView: WebView
+    private lateinit var tokenInput: EditText
+    private lateinit var tokenState: TextView
+    private lateinit var batteryButton: Button
+    private lateinit var toggleButton: Button
     private lateinit var log: TextView
-    private lateinit var buttons: List<Button>
-    private var queue = listOf<Pair<String, String>>()
-    private var startedAt = 0L
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> refresh() }
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        webView = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            webViewClient = WebViewClient()
+        // Needed to show the status notification on Android 13+
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         }
-        log = TextView(this).apply { setPadding(24, 16, 24, 16) }
 
-        val testOne = Button(this).apply {
-            text = "Test 1 page"
-            setOnClickListener { start(pages.take(1)) }
+        tokenState = TextView(this)
+        tokenInput = EditText(this).apply {
+            hint = "Paste GitHub token (github_pat_…)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
-        val testAll = Button(this).apply {
-            text = "Test all 6 pages"
-            setOnClickListener { start(pages) }
+        val saveToken = button("Save token") {
+            val token = tokenInput.text.toString().trim()
+            if (token.isEmpty()) return@button toast("Paste the token first")
+            Store.setToken(this, token)
+            tokenInput.text.clear()
+            startRuns(runNow = true)
         }
-        buttons = listOf(testOne, testAll)
+        val runNow = button("Run now") {
+            if (Store.token(this).isNullOrBlank()) return@button toast("Save a GitHub token first")
+            startRuns(runNow = true)
+            toast("Running… results appear below in about 2 minutes")
+        }
+        toggleButton = button("") {
+            if (Store.enabled(this)) {
+                Store.setEnabled(this, false)
+                SnapshotService.stop(this)
+            } else {
+                startRuns(runNow = false)
+            }
+            refresh()
+        }
+        batteryButton = button("") {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        }
+        log = TextView(this).apply {
+            typeface = Typeface.MONOSPACE
+            textSize = 12f
+            setTextIsSelectable(true)
+        }
 
-        val buttonRow = LinearLayout(this).apply {
-            addView(testOne, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(testAll, LinearLayout.LayoutParams(0, -2, 1f))
-        }
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(buttonRow)
-            addView(ScrollView(context).apply { addView(log) }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(webView, LinearLayout.LayoutParams(-1, 0, 1.4f))
+        setContentView(ScrollView(this).apply {
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(32, 24, 32, 24)
+                addView(tokenState)
+                addView(tokenInput)
+                addView(saveToken)
+                addView(runNow)
+                addView(toggleButton)
+                addView(batteryButton)
+                addView(TextView(context).apply { text = "\nRecent runs (newest first):"; setTypeface(null, Typeface.BOLD) })
+                addView(log)
+            })
         })
 
-        log.text = "Tap a button to test.\n"
+        if (Store.enabled(this)) SnapshotService.start(this)
     }
 
-    private fun start(selected: List<Pair<String, String>>) {
-        buttons.forEach { it.isEnabled = false }
-        // Start like a fresh visitor, so a cookie from an earlier test can't skew the result
-        CookieManager.getInstance().removeAllCookies(null)
-        WebStorage.getInstance().deleteAllData()
-        webView.clearCache(true)
-        log.text = ""
-        queue = selected
-        next()
+    override fun onResume() {
+        super.onResume()
+        Store.prefs(this).registerOnSharedPreferenceChangeListener(prefsListener)
+        refresh()
     }
 
-    private fun next() {
-        val (name, path) = queue.firstOrNull() ?: return done()
-        queue = queue.drop(1)
-        append("$name: loading…")
-        startedAt = System.currentTimeMillis()
-        webView.loadUrl("https://www.royalroad.com$path")
-        handler.postDelayed({ check(name) }, 2000)
+    override fun onPause() {
+        Store.prefs(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
+        super.onPause()
     }
 
-    private fun check(name: String) {
-        val js = "[document.title, document.querySelectorAll('.fiction-list-item').length]"
-        webView.evaluateJavascript(js) { result ->
-            val values = runCatching { JSONArray(result) }.getOrNull()
-            val title = values?.optString(0) ?: "?"
-            val count = values?.optInt(1) ?: 0
-            val seconds = (System.currentTimeMillis() - startedAt) / 1000
-            when {
-                count > 0 -> {
-                    append("$name: OK, $count novels (${seconds}s)")
-                    afterPage()
-                }
-                seconds >= 60 -> {
-                    append("$name: BLOCKED, page title \"$title\"")
-                    afterPage()
-                }
-                else -> handler.postDelayed({ check(name) }, 2000)
-            }
-        }
+    private fun startRuns(runNow: Boolean) {
+        Store.setEnabled(this, true)
+        SnapshotService.start(this, runNow)
     }
 
-    // Wait between pages, like the GitHub scraper, so the test matches real use
-    private fun afterPage() {
-        if (queue.isEmpty()) return done()
-        append("waiting 15s…")
-        handler.postDelayed({ next() }, 15000)
+    private fun refresh() {
+        tokenState.text = if (Store.token(this).isNullOrBlank()) "No GitHub token saved yet." else "GitHub token saved ✓ (paste a new one to replace it)"
+        toggleButton.text = if (Store.enabled(this)) "Stop background runs" else "Start background runs (every 30 min)"
+        val unrestricted = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+        batteryButton.text = if (unrestricted) "Background running allowed ✓" else "Allow running in background"
+        batteryButton.isEnabled = !unrestricted
+        log.text = Store.log(this).ifEmpty { "No runs yet." }
     }
 
-    private fun done() {
-        append("Done.")
-        buttons.forEach { it.isEnabled = true }
+    private fun button(label: String, onClick: () -> Unit) = Button(this).apply {
+        text = label
+        setOnClickListener { onClick() }
     }
 
-    private fun append(line: String) {
-        log.append("$line\n")
-    }
-
-    override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        webView.destroy()
-        super.onDestroy()
-    }
+    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
