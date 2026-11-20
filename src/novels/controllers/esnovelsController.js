@@ -145,7 +145,8 @@ async function getNovelInfo(req, res) {
   const id = req.query.id;
 
   // Validate id
-  if (!id || id.trim() === "") {
+  // Query values can be arrays/objects (e.g. ?id[a]=1), which would make .trim() throw
+  if (typeof id !== "string" || id.trim() === "") {
     return res.status(400).send({
       success: false,
       message: "Id is required and must not be empty."
@@ -197,7 +198,7 @@ async function getNovelInfo(req, res) {
 async function getSearchQuery(req, res) {
   const query = req.query.query || "Hero";
 
-  if (!query.trim()) {
+  if (typeof query !== "string" || !query.trim()) {
     return res.status(400).send({
       success: false,
       message: "Query cannot be empty."
