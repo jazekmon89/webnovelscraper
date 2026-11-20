@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "git": {
-    "deploymentEnabled": {
-      "data": false,
-      "cf-test": false
-    }
-  },
   "builds": [
     {
       "src": "api/index.js",

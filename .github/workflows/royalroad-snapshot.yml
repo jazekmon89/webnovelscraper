@@ -89,10 +89,13 @@ jobs:
           path: data-out/royalroad
           merge-multiple: true
 
-      # The data branch keeps a single commit so its history doesn't grow
+      # The data branch keeps a single commit so its history doesn't grow. Its own
+      # vercel.json stops Vercel from trying (and failing) to deploy each snapshot:
+      # Vercel reads the config from the commit it deploys, not from main.
       - name: Publish snapshot
         working-directory: data-out
         run: |
+          echo '{ "git": { "deploymentEnabled": false } }' > vercel.json
           rm -rf .git
           git init -q -b data
           git config user.name "github-actions[bot]"
