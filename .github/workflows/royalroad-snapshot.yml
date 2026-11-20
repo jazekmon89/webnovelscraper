@@ -1,8 +1,8 @@
 # Scrapes the Royal Road lists every 30 minutes and publishes them as JSON on the
 # "data" branch, which the API reads (see src/novels/scrapper/royalroadScrapper.js).
-# Royal Road's Cloudflare challenge only lets a headful Google Chrome through, and
-# from a runner's IP only the first page per session, so each page gets its own job
-# (and so its own runner).
+# Royal Road's Cloudflare challenge only lets a headful Google Chrome through, and only
+# from some runner IPs, so several runners try in parallel and whichever get through
+# scrape the pages (see scripts/snapshot-royalroad.js).
 name: Royal Road snapshot
 
 on:
@@ -24,18 +24,11 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
-      # Keep in sync with SNAPSHOT_LISTS in src/novels/scrapper/royalroadScrapper.js
       matrix:
-        target:
-          - latest 1
-          - latest 2
-          - latest 3
-          - popular 1
-          - trending 1
-          - weekly 1
+        runner: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v5
 
@@ -49,13 +42,16 @@ jobs:
           npm ci --omit=dev
           npm install --no-save playwright-core@1.56.1
 
-      - name: Scrape Royal Road (${{ matrix.target }})
-        run: xvfb-run -a -s "-screen 0 1366x768x24" node scripts/snapshot-royalroad.js out ${{ matrix.target }}
+      - name: Scrape Royal Road
+        env:
+          SNAPSHOT_OFFSET: ${{ matrix.runner }}
+        run: xvfb-run -a -s "-screen 0 1366x768x24" node scripts/snapshot-royalroad.js out
 
       - uses: actions/upload-artifact@v4
         with:
-          name: snapshot-${{ strategy.job-index }}
+          name: snapshot-${{ matrix.runner }}
           path: out/*.json
+          if-no-files-found: ignore
           retention-days: 1
 
   publish:
