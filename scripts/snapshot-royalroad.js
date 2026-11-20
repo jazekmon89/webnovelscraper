@@ -9,6 +9,28 @@ const { chromium } = require("playwright-core");
 const { BASE_URL, SNAPSHOT_LISTS, parseNovelList } = require("../src/novels/scrapper/royalroadScrapper");
 
 const outDir = process.argv[2] || "royalroad";
+const ATTEMPTS = 2;
+
+// Also report as GitHub Actions annotations, which are readable without opening the log
+function report(level, message) {
+  const log = level === "notice" ? console.log : console.error;
+  log(process.env.GITHUB_ACTIONS ? `::${level}::${message}` : message);
+}
+
+async function scrapePage(page, url, withChapters) {
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await page.waitForSelector(".fiction-list-item", { timeout: 30000 });
+      return parseNovelList(await page.content(), withChapters);
+    } catch (error) {
+      const title = await page.title().catch(() => "?");
+      const message = `${url} attempt ${attempt} failed (page title "${title}"): ${error.message.split("\n")[0]}`;
+      if (attempt === ATTEMPTS) throw new Error(message);
+      report("warning", message);
+    }
+  }
+}
 
 async function main() {
   fs.mkdirSync(outDir, { recursive: true });
@@ -24,16 +46,13 @@ async function main() {
   for (const [list, { path: listPath, pages, withChapters }] of Object.entries(SNAPSHOT_LISTS)) {
     for (let n = 1; n <= pages; n++) {
       try {
-        await page.goto(`${BASE_URL}${listPath}?page=${n}`, { waitUntil: "domcontentloaded", timeout: 45000 });
-        await page.waitForSelector(".fiction-list-item", { timeout: 30000 });
-        const data = parseNovelList(await page.content(), withChapters);
+        const data = await scrapePage(page, `${BASE_URL}${listPath}?page=${n}`, withChapters);
         const snapshot = { updatedAt: new Date().toISOString(), data };
         fs.writeFileSync(path.join(outDir, `${list}-${n}.json`), JSON.stringify(snapshot));
-        console.log(`${list} page ${n}: ${data.length} novels`);
+        report("notice", `${list} page ${n}: ${data.length} novels`);
         saved++;
       } catch (error) {
-        const title = await page.title().catch(() => "?");
-        console.error(`${list} page ${n} failed (page title "${title}"): ${error.message.split("\n")[0]}`);
+        report("error", error.message);
       }
     }
   }
@@ -44,6 +63,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  report("error", error.message.split("\n")[0]);
   process.exit(1);
 });
