@@ -83,7 +83,7 @@ class MainActivity : Activity() {
     }
 
     private fun next() {
-        val (name, path) = queue.firstOrNull() ?: return finish()
+        val (name, path) = queue.firstOrNull() ?: return done()
         queue = queue.drop(1)
         append("$name: loading…")
         startedAt = System.currentTimeMillis()
@@ -114,12 +114,12 @@ class MainActivity : Activity() {
 
     // Wait between pages, like the GitHub scraper, so the test matches real use
     private fun afterPage() {
-        if (queue.isEmpty()) return finish()
+        if (queue.isEmpty()) return done()
         append("waiting 15s…")
         handler.postDelayed({ next() }, 15000)
     }
 
-    private fun finish() {
+    private fun done() {
         append("Done.")
         buttons.forEach { it.isEnabled = true }
     }
